@@ -133,3 +133,8 @@ The analysis doesn't prove that El Niño caused all the changes we observed. Ins
 
 Ultimately, this kind of analysis can support climate-informed energy planning and help decision-makers prepare for uncertainty.
 :::
+
+## Thank You {.center style="text-align: center;"}
+
+Explore the project and R code on GitHub
+<small>[github.com/ceciliadelafuentech/DATA607-DataScienceInContext](https://github.com/ceciliadelafuentech/DATA607-DataScienceInContext)</small>
