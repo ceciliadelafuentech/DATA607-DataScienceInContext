@@ -1,5 +1,10 @@
-.reveal {
-  background-color: #EAF0EB;
+/*-- scss:defaults --*/
+$body-bg: #EAF0EB;
+$body-color: #303B35;
+$presentation-heading-color: #294638;
+
+/*-- scss:rules --*/
+.reveal .slides section {
   color: #303B35;
 }
 
