@@ -1,0 +1,281 @@
+---
+title: "DATA607 DataScience in Context"
+author: "CD"
+format: html
+editor: visual
+---
+
+## Running Code
+
+```{r}
+
+library(tidyverse)
+
+# 1. Download NOAA's monthly SST index data
+url <- "https://www.cpc.ncep.noaa.gov/data/indices/sstoi.indices"
+
+raw <- read.table(url, header = TRUE)
+
+# Check that the expected column names are present
+stopifnot(all(c("YR", "MON", "ANOM.3") %in% names(raw)))
+
+# ANOM.3 is the traditional monthly Niño 3.4 anomaly column
+nino <- raw |>
+  select(YR, MON, nino34 = ANOM.3) |>
+  filter(!is.na(nino34))
+
+# 2. Align each event to a July-June period
+df <- nino |>
+  mutate(
+    event = if_else(MON >= 7, YR, YR - 1),
+    month_idx = if_else(MON >= 7, MON - 6, MON + 6)
+  ) |>
+  filter(event %in% c(1982, 1997, 2015, 2026)) |>
+  mutate(
+    label = if_else(
+      event == 2026,
+      "2026 (so far)",
+      as.character(event)
+    )
+  )
+
+# Find the latest available 2026 observation
+latest <- df |>
+  filter(event == 2026) |>
+  slice_max(month_idx, n = 1, with_ties = FALSE)
+
+stopifnot(nrow(latest) == 1)
+
+latest_month <- month.name[latest$MON[[1]]]
+
+# Separate historical events from 2026
+past <- df |> filter(event != 2026)
+now  <- df |> filter(event == 2026)
+
+# 3. Set colors
+pal <- c(
+  "1982" = "#A5BBA2",
+  "1997" = "#77977B",
+  "2015" = "#496B55",
+  "2026 (so far)" = "#B65D50"
+)
+
+# 4. Create the comparison chart
+p <- ggplot() +
+  geom_hline(
+    yintercept = 0.5,
+    linetype = "dashed",
+    color = "grey50"
+  ) +
+  geom_line(
+    data = past,
+    aes(month_idx, nino34, color = label),
+    linewidth = 1
+  ) +
+  geom_line(
+    data = now,
+    aes(month_idx, nino34, color = label),
+    linewidth = 2
+  ) +
+  geom_point(
+    data = latest,
+    aes(month_idx, nino34, color = label),
+    size = 3
+  ) +
+  annotate(
+    "text",
+    x = latest$month_idx[[1]],
+    y = latest$nino34[[1]],
+    label = sprintf(
+      "%+.2f°C\n(%s)",
+      latest$nino34[[1]],
+      latest_month
+    ),
+    hjust = -0.15,
+    vjust = 0.5,
+    color = "#B65D50",
+    fontface = "bold",
+    size = 3
+  ) +
+  annotate(
+    "text",
+    x = 15,
+    y = 0.6,
+    label = "+0.5°C reference",
+    hjust = 1,
+    vjust = 0,
+    color = "grey40",
+    size = 3.5
+  ) +
+  scale_color_manual(
+    values = pal,
+    breaks = names(pal)
+  ) +
+  scale_x_continuous(
+    breaks = 1:12,
+    labels = c(month.abb[7:12], month.abb[1:6]),
+    expand = expansion(mult = c(0.02, 0.20))
+  ) +
+  labs(
+    title = "Comparing 2026 with past El Niño events",
+    subtitle = paste0(
+      "Monthly Niño 3.4 anomalies, July-June. ",
+      "2026 data through ", latest_month, "."
+    ),
+    x = NULL,
+    y = "Sea surface temperature anomaly (°C)",
+    color = NULL,
+    caption = paste(
+      "Source: NOAA CPC, sstoi.indices;",
+      "traditional monthly anomaly series."
+    )
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    text = element_text(color = "#303B35"),
+    legend.position = "top",
+    legend.text = element_text(color = "#303B35"),
+    plot.title = element_text(
+      color = "#294638",
+      face = "bold"
+    ),
+    plot.subtitle = element_text(color = "#496B55"),
+    axis.text = element_text(color = "#303B35"),
+    axis.title = element_text(color = "#294638"),
+    plot.caption = element_text(color = "#496B55"),
+    panel.grid.minor = element_blank(),
+    plot.background = element_rect(fill = "#EAF0EB", color = NA),
+    panel.background = element_rect(fill = "#EAF0EB", color = NA)
+  )
+
+# Display chart
+p
+
+# Export slide-ready image
+ggsave(
+  "elnino_overlay.png",
+  p,
+  width = 10,
+  height = 5.6,
+  dpi = 200
+)
+
+# Optional: calculate the peak of each selected event
+peaks <- df |>
+  group_by(event) |>
+  slice_max(nino34, n = 1, with_ties = FALSE) |>
+  transmute(
+    event,
+    peak_month = month.name[MON],
+    peak_anomaly = round(nino34, 2)
+  )
+
+print(peaks)
+```
+
+```{r}
+
+india_power <- tribble(
+  ~category,      ~measure,        ~change,
+  "Demand",       "Power demand",    24.3,
+  "Generation",   "Coal",            20.7,
+  "Generation",   "Solar + wind",     9.4,
+  "Generation",   "Hydropower",      -6.3,
+  "Generation",   "Gas",             -0.8
+) |>
+  mutate(
+    category = factor(category, levels = c("Demand", "Generation")),
+    measure = factor(
+      measure,
+      levels = c("Power demand", "Coal", "Solar + wind", "Hydropower", "Gas")
+    )
+  )
+
+# Assign colors based on whether the value increased or decreased
+india_power <- india_power |>
+  mutate(
+    direction = case_when(
+      change < 0 ~ "Decrease",
+      category == "Demand" ~ "Demand increase",
+      TRUE ~ "Generation increase"
+    )
+  )
+
+# Use these layers in your existing ggplot code
+p <- ggplot(
+  india_power,
+  aes(x = change, y = measure, fill = direction)
+) +
+  geom_vline(
+    xintercept = 0,
+    color = "grey50",
+    linewidth = 0.5
+  ) +
+  geom_col(width = 0.65, show.legend = FALSE) +
+  geom_text(
+    aes(
+      label = sprintf("%+.1f", change),
+      hjust = if_else(change >= 0, -0.2, 1.2)
+    ),
+    size = 4
+  ) +
+  facet_grid(
+    category ~ .,
+    scales = "free_y",
+    space = "free_y"
+  ) +
+    scale_fill_manual(
+    values = c(
+      "Demand increase" = "#294638",
+      "Generation increase" = "#77977B",
+      "Decrease" = "#B65D50"
+    )
+  ) +
+  scale_x_continuous(
+    name = "Change in average power (GW)",
+    breaks = seq(-10, 30, by = 10),
+    expand = expansion(mult = c(0.08, 0.15))
+  ) +
+  labs(
+    title = "India's electricity demand and generation changes",
+    subtitle = "June 2026 compared with June 2025",
+    y = NULL,
+    caption = paste(
+      "Source: S&P Global figures reported by Business Standard,",
+      "July 2026."
+    )
+  ) +
+ theme_minimal(base_size = 13) +
+  theme(
+    text = element_text(color = "#303B35"),
+    plot.title = element_text(
+      color = "#294638",
+      face = "bold"
+    ),
+    plot.subtitle = element_text(color = "#496B55"),
+    axis.text = element_text(color = "#303B35"),
+    axis.title = element_text(color = "#294638"),
+    plot.caption = element_text(color = "#496B55"),
+    strip.text.y = element_text(
+      angle = 0,
+      face = "bold",
+      color = "#294638"
+    ),
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.spacing.y = grid::unit(1, "lines"),
+    plot.background = element_rect(fill = "#EAF0EB", color = NA),
+    panel.background = element_rect(fill = "#EAF0EB", color = NA)
+  )
+
+p
+
+ggsave(
+  "india_june_power.png",
+  p,
+  width = 10,
+  height = 5.6,
+  dpi = 200
+)
+
+```
