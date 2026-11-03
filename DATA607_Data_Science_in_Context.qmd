@@ -6,8 +6,10 @@ format:
   revealjs:
     slide-number: true
     transition: fade
+    theme:
+      - default
+      - custom.scss
     code-fold: true
-    css: custom.scss
 execute:
   echo: false
 ---
